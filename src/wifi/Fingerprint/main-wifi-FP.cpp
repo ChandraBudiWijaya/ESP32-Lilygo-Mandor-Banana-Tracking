@@ -1,9 +1,14 @@
+// =======================================================
+//   MANDOR BANANA TRACKING - MAIN SKETCH
+//   Versi: WiFi + Fingerprint
+// =======================================================
+
 #include <Arduino.h>
 #include "config.h"
 #include "gps_utils.h"
 #include "sd_utils.h"
 #include "network_utils.h"
-#include "fingerprint_utils.h" // Tambahkan ini
+#include "fingerprint_utils.h"
 
 // === STATE & PEWAKTU GLOBAL ===
 bool ledState = false;

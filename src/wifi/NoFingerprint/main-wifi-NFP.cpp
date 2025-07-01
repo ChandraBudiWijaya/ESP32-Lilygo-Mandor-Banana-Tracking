@@ -1,6 +1,6 @@
 // =======================================================
 //   MANDOR BANANA TRACKING - MAIN SKETCH
-//   Versi: WiFi, Tanpa Fingerprint, Prioritas Sinkronisasi
+//   Versi: WiFi Tanpa Fingerprint
 // =======================================================
 
 #include <Arduino.h>
@@ -8,7 +8,6 @@
 #include "gps_utils.h"
 #include "sd_utils.h"
 #include "network_utils.h"
-#include <Adafruit_Fingerprint.h>
 
 // === STATE & PEWAKTU GLOBAL ===
 bool ledState = false;

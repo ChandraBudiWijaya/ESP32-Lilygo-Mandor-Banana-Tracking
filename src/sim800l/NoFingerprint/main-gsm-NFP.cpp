@@ -1,3 +1,8 @@
+// =======================================================
+//   MANDOR BANANA TRACKING - MAIN SKETCH
+//   Versi: SIM800L Tanpa Fingerprint
+// =======================================================
+
 #include <Arduino.h>
 #include "config.h"
 #include "gps_utils.h"
