@@ -85,27 +85,36 @@ void network_loop() {
     }
 }
 
+/**
+ * @brief Membuat payload JSON dan mempublikasikannya ke MQTT atau menyimpannya ke antrean.
+ *
+ * @param data Struct GpsData yang berisi informasi yang akan dikirim.
+ */
 void publish_data(const GpsData& data) {
     if (!data.isValid) return;
 
-    StaticJsonDocument<256> doc;
+    // UPDATE: Gunakan JsonDocument yang direkomendasikan ArduinoJson v7+
+    JsonDocument doc;
     doc["index_karyawan"] = INDEX_KARYAWAN;
     doc["lat"] = data.lat;
     doc["lng"] = data.lng;
-    doc["timestamp"] = data.isoTimestamp;
+    doc["device_timestamp"] = data.isoTimestamp;
     doc["hdop"] = data.hdop;
     doc["satellites"] = data.satellites;
-    
-    char payload[256];
+
+    // UPDATE: Serialize ke objek String untuk manajemen memori yang lebih aman
+    String payload;
     serializeJson(doc, payload);
 
     if (mqtt.connected()) {
         Serial.print("Publishing live data: ");
         Serial.println(payload);
-        mqtt.publish(mqtt_topic, payload);
+        // Kirim data dengan mengonversinya ke const char*
+        mqtt.publish(mqtt_topic, payload.c_str());
     } else {
         Serial.println("MQTT not connected. Queuing data.");
-        add_to_offline_queue(payload);
+        // Simpan data dengan mengonversinya ke const char*
+        add_to_offline_queue(payload.c_str());
     }
 }
 

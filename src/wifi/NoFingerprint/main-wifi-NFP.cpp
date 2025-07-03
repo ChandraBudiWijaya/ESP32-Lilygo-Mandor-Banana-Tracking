@@ -94,6 +94,6 @@ void loop() {
   if (mqtt.connected() && isOfflineQueueNotEmpty()) {
     Serial.println("Offline queue detected. Prioritizing sync...");
     sync_offline_data(); // Coba kirim satu data dari antrean.
-    delay(200); // Beri jeda singkat untuk memberi napas pada jaringan.
+    delay(750); // Beri jeda singkat untuk memberi napas pada jaringan.
   }
 }
