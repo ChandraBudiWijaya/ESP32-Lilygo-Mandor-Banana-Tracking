@@ -1,5 +1,5 @@
 // =======================================================
-//   MANDOR BANANA TRACKING - MAIN SKETCH
+//   MANDOR TRACKING SYSTEM - MAIN SKETCH
 //   Versi: WiFi Tanpa Fingerprint
 // =======================================================
 
@@ -33,7 +33,7 @@ void handle_status_led() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n--- Mandor Banana Tracker Starting (Priority Sync & Offline Fix) ---");
+  Serial.println("\n--- Mandor Tracking System Starting (Priority Sync & Offline Fix) ---");
 
   // Inisialisasi pin untuk LED status
   pinMode(GREEN_LED_PIN, OUTPUT);

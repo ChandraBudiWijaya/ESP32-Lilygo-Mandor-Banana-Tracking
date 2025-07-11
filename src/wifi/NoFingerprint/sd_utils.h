@@ -150,7 +150,6 @@ void write_to_daily_log(const GpsData& data) {
   file.close();
 }
 
-
 /**
  * @brief Menambahkan satu baris payload JSON ke file antrean offline.
  */

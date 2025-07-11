@@ -1,32 +1,43 @@
 #pragma once
 
-// Matikan fitur WiFi bawaan untuk menghemat memori
 #define TINY_GSM_MODEM_SIM800
 #include <TinyGsmClient.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-
+#include <WiFi.h> // Diperlukan untuk MAC Address dan mematikan WiFi
 #include "config.h"
 #include "sd_utils.h"
 
-// Inisialisasi modem pada Serial Port 1 ESP32
 HardwareSerial simSerial(1);
 TinyGsm modem(simSerial);
-
-// Gunakan TinyGsmClientSecure untuk koneksi MQTT yang aman (port 8883)
-TinyGsmClientSecure client(modem);
+TinyGsmClient client(modem);
 PubSubClient mqtt(client);
 
-// Variabel untuk manajemen koneksi GPRS & MQTT
+// Variabel untuk menyimpan Client ID unik
+String clientId;
+
 unsigned long lastReconnectAttempt = 0;
-const long reconnectInterval = 30000; // Coba koneksi ulang setiap 30 detik jika gagal
+const long reconnectInterval = 30000;
 
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {}
 
-/**
- * @brief Menginisialisasi modem SIM800L.
- */
-bool init_modem() {
+void mqtt_connect() {
+    Serial.print("Connecting to MQTT broker...");
+    if (mqtt.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
+        Serial.println(" success");
+        
+        // === WIFI DIMATIKAN DI SINI SETELAH MQTT BERHASIL TERHUBUNG ===
+        Serial.println("MQTT connected. Turning off WiFi to save power.");
+        WiFi.mode(WIFI_OFF);
+        // =============================================================
+
+    } else {
+        Serial.print(" failed with state ");
+        Serial.println(mqtt.state());
+    }
+}
+
+void init_network() {
     pinMode(MODEM_PWKEY, OUTPUT);
     pinMode(MODEM_RST, OUTPUT);
     pinMode(MODEM_POWER_ON, OUTPUT);
@@ -36,89 +47,63 @@ bool init_modem() {
     digitalWrite(MODEM_POWER_ON, HIGH);
 
     simSerial.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
-    
+
+    // Aktifkan WiFi hanya untuk mengambil MAC Address
+    WiFi.mode(WIFI_STA);
+    clientId = "MandorTracker-";
+    clientId += WiFi.macAddress();
+    Serial.print("Using unique Client ID: ");
+    Serial.println(clientId);
+    // Jangan matikan WiFi di sini, biarkan aktif sampai MQTT terhubung
+
     Serial.println("Initializing modem...");
     if (!modem.init()) {
-        Serial.println("Failed to init modem. Check connections.");
-        return false;
-    }
-    
-    String modemInfo = modem.getModemInfo();
-    Serial.print("Modem Info: ");
-    Serial.println(modemInfo);
-    
-    return true;
-}
-
-/**
- * @brief Menghubungkan ke jaringan GPRS.
- */
-bool connect_gprs() {
-    Serial.print("Connecting to GPRS...");
-    if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-        Serial.println(" fail");
-        return false;
-    }
-    Serial.println(" success");
-    Serial.print("Signal Quality: ");
-    Serial.println(modem.getSignalQuality());
-    return true;
-}
-
-/**
- * @brief Menghubungkan ke server MQTT.
- */
-void mqtt_connect() {
-    Serial.print("Connecting to MQTT broker...");
-    if (mqtt.connect(INDEX_KARYAWAN, mqtt_user, mqtt_pass)) {
-        Serial.println(" success");
-    } else {
-        Serial.print(" failed with state ");
-        Serial.println(mqtt.state());
-    }
-}
-
-/**
- * @brief Inisialisasi jaringan utama (Modem dan MQTT).
- */
-void init_network() {
-    if (!init_modem()) {
-        Serial.println("Halting due to modem failure.");
+        Serial.println("FATAL: Failed to init modem. Halting.");
         while(1);
     }
-    mqtt.setServer(mqtt_server, mqtt_port);
-    mqtt.setCallback(mqtt_callback);
-}
 
-/**
- * @brief Fungsi loop untuk menjaga koneksi GPRS dan MQTT.
- */
-void network_loop() {
-    if (!modem.isNetworkConnected()) {
-        Serial.println("GPRS disconnected. Attempting to reconnect...");
-        connect_gprs();
+    Serial.println("Waiting for network...");
+    if (!modem.waitForNetwork(60000L)) {
+        Serial.println("Network connection failed.");
+    } else {
+        Serial.println("Network connected.");
     }
     
-    if (!mqtt.connected()) {
+    Serial.print("Signal Quality: ");
+    Serial.println(modem.getSignalQuality());
+
+    Serial.print("Connecting to GPRS with APN: ");
+    Serial.println(apn);
+    if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+        Serial.println("GPRS connection failed. Will retry in loop.");
+    } else {
+        Serial.println("GPRS connected successfully!");
+    }
+
+    mqtt.setServer(mqtt_server, mqtt_port);
+    mqtt.setCallback(mqtt_callback);
+    mqtt.setBufferSize(512);
+}
+
+void network_loop() {
+    if (!modem.isGprsConnected()) {
+        Serial.println("GPRS disconnected. Attempting to reconnect...");
+        modem.gprsConnect(apn, gprsUser, gprsPass);
+    }
+    
+    if (modem.isGprsConnected() && !mqtt.connected()) {
         if (millis() - lastReconnectAttempt > reconnectInterval) {
             lastReconnectAttempt = millis();
-            if (modem.isGprsConnected()) {
-                mqtt_connect();
-            }
+            mqtt_connect();
         }
     }
+    
     mqtt.loop();
 }
 
-/**
- * @brief Membuat payload JSON dan mempublikasikannya ke MQTT atau menyimpannya ke antrean.
- *
- * @param data Struct GpsData yang berisi informasi yang akan dikirim.
- */
 void publish_data(const GpsData& data) {
     if (!data.isValid) return;
 
-    // UPDATE: Gunakan JsonDocument yang direkomendasikan ArduinoJson v7+
     JsonDocument doc;
     doc["index_karyawan"] = INDEX_KARYAWAN;
     doc["lat"] = data.lat;
@@ -126,19 +111,16 @@ void publish_data(const GpsData& data) {
     doc["device_timestamp"] = data.isoTimestamp;
     doc["hdop"] = data.hdop;
     doc["satellites"] = data.satellites;
-
-    // UPDATE: Serialize ke objek String untuk manajemen memori yang lebih aman
+    
     String payload;
     serializeJson(doc, payload);
 
     if (mqtt.connected()) {
         Serial.print("Publishing live data: ");
         Serial.println(payload);
-        // Kirim data dengan mengonversinya ke const char*
         mqtt.publish(mqtt_topic, payload.c_str());
     } else {
         Serial.println("MQTT not connected. Queuing data.");
-        // Simpan data dengan mengonversinya ke const char*
         add_to_offline_queue(payload.c_str());
     }
 }

@@ -1,5 +1,5 @@
 // =======================================================
-//   MANDOR BANANA TRACKING - MAIN SKETCH
+//   MANDOR TRACKING SYSTEM - MAIN SKETCH
 //   Versi: SIM800L + Fingerprint
 // =======================================================
 
@@ -38,7 +38,7 @@ void handle_status_led() {
  */
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n--- Mandor Banana Tracker (SIM800L + Fingerprint + Re-Validation) ---");
+  Serial.println("\n--- Mandor Tracking System (SIM800L + Fingerprint + Priority Sync & Offline Fix) ---");
 
   // Inisialisasi pin-pin LED
   pinMode(GREEN_LED_PIN, OUTPUT);
@@ -46,13 +46,31 @@ void setup() {
   digitalWrite(RED_LED_PIN, LOW);
   
   // Inisialisasi semua modul perangkat keras
-  init_network(); 
   init_gps();
+  init_network();
+  WiFi.mode(WIFI_OFF);
+  btStop();
   
-  if (!init_sd_card() || !init_fingerprint()) {
-    Serial.println("FATAL: SD Card or Fingerprint sensor failed. Halting.");
+  // Inisialisasi Kartu SD adalah langkah kritis.
+  // Jika gagal, hentikan program karena mode offline tidak akan berfungsi.
+  if (!init_sd_card()) {
+    Serial.println("FATAL: SD Card failed. Halting.");
     digitalWrite(RED_LED_PIN, HIGH);
-    while(1); // Hentikan program jika ada kegagalan kritis
+    while(1) {
+      // Berhenti di sini, kedipkan LED merah sebagai tanda error fatal.
+      digitalWrite(RED_LED_PIN, !digitalRead(RED_LED_PIN));
+      delay(100);
+    }
+  }
+
+  if (!init_fingerprint()) {
+    Serial.println("FATAL: Fingerprint sensor failed. Halting.");
+    digitalWrite(RED_LED_PIN, HIGH);
+    while(1) {
+      // Berhenti di sini, kedipkan LED merah sebagai tanda error fatal.
+      digitalWrite(RED_LED_PIN, !digitalRead(RED_LED_PIN));
+      delay(100);
+    }
   }
 
   // --- TAHAP OTENTIKASI AWAL ---
@@ -75,7 +93,7 @@ void setup() {
     }
   }
 
-  Serial.println("\nAuthentication successful. Starting main tracking loop...");
+  Serial.println("\nAuthentication successful. Setup complete. Starting main loop...");
 }
 
 /**
@@ -83,8 +101,9 @@ void setup() {
  */
 void loop() {
   // --- TUGAS LATAR BELAKANG (SELALU BERJALAN) ---
+  // Tugas-tugas ini penting untuk menjaga status dan konektivitas perangkat.
   handle_status_led();
-  network_loop(); // Selalu coba jaga koneksi GPRS dan MQTT
+  network_loop(); // Menangani koneksi SIM800L & MQTT secara otomatis.
 
   // --- LOGIKA VALIDASI ULANG SETIAP 1 JAM ---
   // Cek apakah sudah waktunya untuk meminta verifikasi sidik jari kembali
@@ -109,7 +128,8 @@ void loop() {
 
   // --- OPERASI NORMAL (HANYA BERJALAN JIKA TEROTENTIKASI) ---
 
-  // 1. Proses & Kirim Data GPS secara Periodik
+  // --- LOGIKA PENCATATAN & PENGIRIMAN DATA PERIODIK ---
+  // Blok ini dieksekusi setiap interval PUBLISH_INTERVAL_MS untuk memproses data GPS.
   if (millis() - lastPublishMillis >= PUBLISH_INTERVAL_MS) {
     lastPublishMillis = millis();
     GpsData currentGpsData = read_gps_data();
@@ -118,10 +138,13 @@ void loop() {
       Serial.println("\n--- Processing New GPS Data ---");
       Serial.printf("Satelit: %u | HDOP: %.2f\n", (unsigned int)currentGpsData.satellites, currentGpsData.hdop);
       
-      // Pencatatan ke SD Card tetap berjalan untuk backup data
+      // 1. SIMPAN: Selalu tulis data ke log harian di SD Card.
+      //    Ini adalah jaring pengaman utama agar tidak ada data yang hilang.
       write_to_daily_log(currentGpsData);
       
-      // Pengiriman data HANYA dilakukan jika terotentikasi.
+      // 2. KIRIM/ANTREKAN: Fungsi publish_data() sudah cerdas:
+      //    - Jika online, data langsung dikirim ke server MQTT.
+      //    - Jika offline, data otomatis disimpan ke file antrean di SD Card.
       publish_data(currentGpsData);
 
     } else {
@@ -129,10 +152,12 @@ void loop() {
     }
   }
 
-  // 2. Sinkronisasi Data Offline dari Antrean
+  // --- LOGIKA SINKRONISASI PRIORITAS ---
+  // Jika perangkat online dan ada data di antrean offline,
+  // prioritaskan pengiriman data lama terlebih dahulu.
   if (mqtt.connected() && isOfflineQueueNotEmpty()) {
-    Serial.println("Offline queue detected. Syncing...");
-    sync_offline_data();
-    delay(1000); // Beri jeda lebih lama setelah sinkronisasi untuk stabilitas GPRS
+    Serial.println("Offline queue detected. Prioritizing sync...");
+    sync_offline_data(); // Coba kirim satu data dari antrean.
+    delay(750); // Beri jeda singkat untuk memberi napas pada jaringan.
   }
 }

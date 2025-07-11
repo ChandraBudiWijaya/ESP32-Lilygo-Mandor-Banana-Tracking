@@ -1,5 +1,5 @@
 // =======================================================
-//   MANDOR BANANA TRACKING - MAIN SKETCH
+//   MANDOR TRACKING SYSTEM - MAIN SKETCH
 //   Versi: WiFi + Fingerprint
 // =======================================================
 
@@ -25,7 +25,7 @@ void handle_status_led() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n--- Mandor Banana Tracker (WiFi + Fingerprint) ---");
+  Serial.println("\n--- Mandor Tracking System (WiFi + Fingerprint) ---");
 
   pinMode(GREEN_LED_PIN, OUTPUT);
   pinMode(RED_LED_PIN, OUTPUT);

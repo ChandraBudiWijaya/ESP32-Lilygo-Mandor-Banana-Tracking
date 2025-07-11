@@ -26,7 +26,7 @@ struct GpsData {
 // Inisialisasi objek TinyGPS++ untuk mem-parsing data NMEA dari GPS.
 TinyGPSPlus gps;
 // Menggunakan Serial Port 2 dari ESP32 untuk komunikasi dengan modul GPS.
-HardwareSerial gpsSerial(1);
+HardwareSerial gpsSerial(2);
 
 /**
  * @brief Menginisialisasi komunikasi serial dengan modul GPS.

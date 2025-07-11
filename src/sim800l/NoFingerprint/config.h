@@ -27,14 +27,14 @@ const int GREEN_LED_PIN = 12;
 const int RED_LED_PIN   = 25;
 
 // --- KONFIGURASI JARINGAN GPRS & MQTT ---
-const char apn[]      = "internet"; // <-- GANTI SESUAI OPERATOR
+const char apn[]      = "M2MAUTOTRONIC"; // <-- GANTI SESUAI OPERATOR
 const char gprsUser[] = "";
 const char gprsPass[] = "";
 
-const char* mqtt_server = "b1f52b909a3541e1971aae91fb7b08f4.s1.eu.hivemq.cloud";
-const int   mqtt_port   = 8883;
-const char* mqtt_user   = "PKLGGF";
-const char* mqtt_pass   = "PklGGF123";
+const char* mqtt_server = "test.mosquitto.org";
+const int   mqtt_port   = 1883;
+const char* mqtt_user   = ""; // Harus string kosong
+const char* mqtt_pass   = ""; // Harus string kosong
 const char* mqtt_topic  = "mandor/tracking/data";
 
 // --- PENGATURAN INTERVAL ---
